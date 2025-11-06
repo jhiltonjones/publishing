@@ -39,7 +39,7 @@ def seq_mat_tv(Phi_list, B_list):
         Mc[i*n:(i+1)*n, 0:i*m] = Phi_list[i] @ Mc[(i-1)*n:i*n, 0:i*m]
         Mc[i*n:(i+1)*n, i*m:(i+1)*m] = B_list[i]
 
-        return Mx, Mc
+    return Mx, Mc
     
 def seq_mat_lti(A, B, N):
 

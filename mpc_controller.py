@@ -4,9 +4,8 @@ from mpc_controller_functions import trust_radius
 from mpc_controller_functions import seq_mat_tv, solve_qp_osqp
 
 class MPC_controller:
-    def __init__(self, *, theta_fn, J_fn, dt = 0.0, Np = 10, w_th = 10.0, w_u = 5e-2, theta_band_deg=10.0, eps_theta_deg = 10.0, h_deg_for_radius = 0.5,
-                 trust_region_deg = 180, theta_max_deg = 90, u_max_deg_s = 90, j6_min_rad = -5.0, j6_max_rad = 5.0, rate_limit_deg = 15.0):
-        self.theta_fn = theta_fn
+    def __init__(self, *, J_fn, dt = 0.0, Np = 10, w_th = 10.0, w_u = 5e-2, theta_band_deg=10.0, eps_theta_deg = 10.0, h_deg_for_radius = 0.5,
+                 trust_region_deg = 180, theta_max_deg = 90, u_max_deg_s = 90, rate_limit_deg = 15.0):
         self.J_fn = J_fn
         self.dt = float(dt)
         self.Np = int(Np)
@@ -18,8 +17,6 @@ class MPC_controller:
         self.trust_region = np.deg2rad(trust_region_deg)
         self.theta_max = np.deg2rad(theta_max_deg)
         self.u_max = np.deg2rad(u_max_deg_s)
-        self.j6_min = float(j6_min_rad)
-        self.j6_max = float(j6_max_rad)
         self.rate_limit = np.deg2rad(rate_limit_deg)
         self.A = np.array([[1.0]])
         self.Qf = None
@@ -31,9 +28,10 @@ class MPC_controller:
         
     def set_dt(self, new_dt):
         self.dt = float(new_dt)
+        self.S_np = np.tril(np.ones((self.Np, self.Np))) * self.dt
     def _tv_gain_sequence(self, B_list):
         P_next = self.Qf if self.Qf is not None else solve_discrete_are(self.A, B_list[-1], self.Q, self.R)
-        K_seq = [None]* self.dt
+        K_seq = [None]* self.Np
         for k in range(self.Np-1, -1, -1):
             Bk = B_list[k]
             S = self.R +Bk.T @ P_next @ Bk
@@ -52,7 +50,7 @@ class MPC_controller:
         U_nom[-1] = U_nom[-2] if self.Np >1 else U_nom[-1]
         psi_nom = psi_now + self.S_np @ U_nom
         B_list = []
-        dpsi_vec = np.zeros(self.dt)
+        dpsi_vec = np.zeros(self.Np)
 
         for i in range(self.Np):
             Ji = float(self.J_fn(psi_nom[i]))
@@ -94,7 +92,7 @@ class MPC_controller:
         A_osqp = np.empty((0, self.Np*m)); l_osqp = np.empty(0); u_osqp = np.empty(0)
         A_tube = self.S_np @ J_u                       
         offset = (self.S_np @ (U0 - U_nom.reshape(self.Np,1))).reshape(self.Np) 
-        dpsi_bound = max(dpsi_vec, 1e-12)        
+        dpsi_bound = np.maximum(dpsi_vec, 1e-12)        
 
         l_tube = -dpsi_bound - offset
         u_tube = +dpsi_bound - offset
@@ -136,8 +134,8 @@ class MPC_controller:
             X_pred = np.full((self.Np,1), np.nan)
             psi_pred = np.full((self.Np,), np.nan)   
         else:
-            c_col = np.asarray(c_opt).reshape(self.np,1)
-            X_pred = (X0 +Mc @c_col).reshape(self.np,1)
+            c_col = np.asarray(c_opt).reshape(self.Np,1)
+            X_pred = (X0 +Mc @c_col).reshape(self.Np,1)
             U_pred = (Kbar @ X_pred + c_col).ravel()
             U_tr = U_pred
             u0 = float(U_tr[0])
