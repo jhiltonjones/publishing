@@ -62,7 +62,7 @@ def seq_mat_lti(A, B, N):
 
 
 def solve_qp_osqp(H,f,A, l, u, U_warm = None):
-    P = sp.csc_matrix((H+H.T)) #This is a sparse matrix which only keeps non-zero entries for efficiency 
+    P = sp.csc_matrix(0.5 * (H+H.T)) #This is a sparse matrix which only keeps non-zero entries for efficiency 
     q = f.astype(float)#Expects this as a float 64 and will fail if this is not the case
     A = sp.csc_matrix(A)
     prob = osqp.OSQP()
