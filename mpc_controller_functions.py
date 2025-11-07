@@ -3,7 +3,7 @@ import osqp
 from scipy.linalg import solve_discrete_are, block_diag
 import scipy.sparse as sp
 
-def dare_stabilizing_K(A, B, Q, R):
+def dare_stabilising_K(A, B, Q, R):
     P = solve_discrete_are(A, B, Q, R)
     K = -np.linalg.solve(R + B.T @ P @ B, B.T @ P @ A)
     return K, P
