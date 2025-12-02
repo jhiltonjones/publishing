@@ -230,8 +230,6 @@ def single_epm_pose_from_B_unrestricted(B_req, mu_mag, e_r, mu0=4e-7*np.pi):
     # place magnet so vector (magnet -> origin) = r_mag * e_r
     r_vec = -r_mag * e_r
 
-    # --- build a full 3D rotation with y_body = mu_hat ---
-    # y_body in world coords:
     y_body = mu_hat
 
     # pick an "up" vector not parallel to y_body
@@ -243,8 +241,16 @@ def single_epm_pose_from_B_unrestricted(B_req, mu_mag, e_r, mu0=4e-7*np.pi):
     x_body = np.cross(up, y_body)
     x_body /= np.linalg.norm(x_body)
 
-    # z_body = x_body × y_body  (already orthogonal and normalized)
+    # z_body = x_body × y_body
     z_body = np.cross(x_body, y_body)
+
+    # # Enforce that body z-axis roughly points "up" in world frame
+    # if z_body[2] < 0:
+    #     x_body = -x_body
+    #     z_body = -z_body
+
+    R_epm = np.column_stack((x_body, y_body, z_body))
+
 
     # columns of R_epm are body axes expressed in world frame
     R_epm = np.column_stack((x_body, y_body, z_body))
@@ -369,14 +375,14 @@ def epm_pose_for_tip_xy(x, y,
 
     # 1) x,y -> thetas  (constant curvature in x–y plane)
     # thetas_target = thetas_from_xy(x, y, lengths, L_cat)
-    thetas_target = np.array([np.deg2rad(15)])
+    thetas_target = np.array([np.deg2rad(-15)])
     # 2) thetas -> required B
     B_req, info = magnetic_field_for_theta(
         thetas_target, axes, lengths, masses, eta0_list,
         f_e=np.zeros(6*len(lengths)),
         gvec=gvec, E=E, r=r, nu=nu,
         R_base=None, p_base=None, quad_n=quad_n,
-        prefer_dir=prefer_B_dir,
+        prefer_dir=None,
         reg=0.0
     )
 
@@ -389,7 +395,7 @@ def epm_pose_for_tip_xy(x, y,
 #  Beam & EPM parameters for your final block
 # ======================
 
-L_cat = 0.047
+L_cat = 0.06
 L1    = L_cat
 r1    = 0.001
 
@@ -411,7 +417,7 @@ E_arr   = np.array([E_niti],   float)
 nu_arr  = np.array([0.49],     float)
 f_e     = np.zeros(6*n, float)
 
-Br   = 1
+Br   = 1.3
 mu0  = 4e-7 * np.pi
 D_ipm = 15e-4
 L_ipm = 4e-2
@@ -494,7 +500,7 @@ def tip_pos_from_B_s(x,               # x = [Bx, By, Bz, s]
     return p_tip
 
 
-print(R_epm)
+print(repr(R_epm))
 print(thetas_target)
 # thetas_target2 = np.array([np.deg2rad(1)])
 thetas_eq = my_gauss_newton_lm(
@@ -520,188 +526,188 @@ print("μ from R_epm @ e_y:", mu_check)
 
 
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # needed for 3D projection
-import numpy as np
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D  # needed for 3D projection
+# import numpy as np
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # needed for 3D projection
-import numpy as np
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D  # needed for 3D projection
+# import numpy as np
 
-def plot_beam_and_epm(axes_list, thetas, lengths,
-                      r_epm, mu_hat_epm, R_epm,
-                      B_req=None,
-                      R_base=None, p_base=None,
-                      cyl_radius=0.15,
-                      cyl_length=0.9):
-    """
-    Visualise:
-      - beam centerline,
-      - external cylindrical magnet:
-          * axis along WORLD Z,
-          * r_epm = magnet CENTRE (same as dipole position),
-          * half red / half blue on circular cross-section,
-            split rotated to match the dipole direction
-            (projection of μ̂ onto x–y plane),
-      - EPM dipole direction (μ̂),
-      - (optionally) B-field at origin,
-      - (optionally) EPM local axes from R_epm.
-    """
+# def plot_beam_and_epm(axes_list, thetas, lengths,
+#                       r_epm, mu_hat_epm, R_epm,
+#                       B_req=None,
+#                       R_base=None, p_base=None,
+#                       cyl_radius=0.15,
+#                       cyl_length=0.9):
+#     """
+#     Visualise:
+#       - beam centerline,
+#       - external cylindrical magnet:
+#           * axis along WORLD Z,
+#           * r_epm = magnet CENTRE (same as dipole position),
+#           * half red / half blue on circular cross-section,
+#             split rotated to match the dipole direction
+#             (projection of μ̂ onto x–y plane),
+#       - EPM dipole direction (μ̂),
+#       - (optionally) B-field at origin,
+#       - (optionally) EPM local axes from R_epm.
+#     """
 
-    # Get beam nodes from stack_blocks
-    Rs_si, ps_si, J, R_nodes, p_nodes = stack_blocks(
-        axes_list, thetas, lengths,
-        s_list=lengths,
-        R_base=R_base, p_base=p_base
-    )
-    p_nodes = np.asarray(p_nodes)
+#     # Get beam nodes from stack_blocks
+#     Rs_si, ps_si, J, R_nodes, p_nodes = stack_blocks(
+#         axes_list, thetas, lengths,
+#         s_list=lengths,
+#         R_base=R_base, p_base=p_base
+#     )
+#     p_nodes = np.asarray(p_nodes)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111, projection='3d')
 
-    # --- Plot beam centerline ---
-    ax.plot(p_nodes[:, 0], p_nodes[:, 1], p_nodes[:, 2],
-            '-o', label='Beam', linewidth=2)
+#     # --- Plot beam centerline ---
+#     ax.plot(p_nodes[:, 0], p_nodes[:, 1], p_nodes[:, 2],
+#             '-o', label='Beam', linewidth=2)
 
-    # Mark base and tip
-    ax.scatter(p_nodes[0, 0], p_nodes[0, 1], p_nodes[0, 2],
-               color='k', s=40, label='Base')
-    ax.scatter(p_nodes[-1, 0], p_nodes[-1, 1], p_nodes[-1, 2],
-               color='r', s=40, label='Tip')
+#     # Mark base and tip
+#     ax.scatter(p_nodes[0, 0], p_nodes[0, 1], p_nodes[0, 2],
+#                color='k', s=40, label='Base')
+#     ax.scatter(p_nodes[-1, 0], p_nodes[-1, 1], p_nodes[-1, 2],
+#                color='r', s=40, label='Tip')
 
-    # --- EPM position ---
-    r_epm = np.asarray(r_epm, float)
-    mu_hat_epm = np.asarray(mu_hat_epm, float)
-    R_epm = np.asarray(R_epm, float)
+#     # --- EPM position ---
+#     r_epm = np.asarray(r_epm, float)
+#     mu_hat_epm = np.asarray(mu_hat_epm, float)
+#     R_epm = np.asarray(R_epm, float)
 
-    ax.scatter(r_epm[0], r_epm[1], r_epm[2],
-               color='magenta', s=60, label='Magnet center / dipole')
+#     ax.scatter(r_epm[0], r_epm[1], r_epm[2],
+#                color='magenta', s=60, label='Magnet center / dipole')
 
-    # ---------- External magnet as cylinder aligned with WORLD Z ----------
-    # r_epm is the *center* of the cylinder.
-    # Cylinder axis: world z
-    n_theta = 80
-    n_h = 10
+#     # ---------- External magnet as cylinder aligned with WORLD Z ----------
+#     # r_epm is the *center* of the cylinder.
+#     # Cylinder axis: world z
+#     n_theta = 80
+#     n_h = 10
 
-    theta = np.linspace(0.0, 2*np.pi, n_theta)
-    h = np.linspace(-cyl_length/2.0, cyl_length/2.0, n_h)  # centered at r_epm.z
-    theta_grid, h_grid = np.meshgrid(theta, h)
+#     theta = np.linspace(0.0, 2*np.pi, n_theta)
+#     h = np.linspace(-cyl_length/2.0, cyl_length/2.0, n_h)  # centered at r_epm.z
+#     theta_grid, h_grid = np.meshgrid(theta, h)
 
-    # Cylinder geometry in world frame
-    Xc = r_epm[0] + cyl_radius * np.cos(theta_grid)
-    Yc = r_epm[1] + cyl_radius * np.sin(theta_grid)
-    Zc = r_epm[2] + h_grid
+#     # Cylinder geometry in world frame
+#     Xc = r_epm[0] + cyl_radius * np.cos(theta_grid)
+#     Yc = r_epm[1] + cyl_radius * np.sin(theta_grid)
+#     Zc = r_epm[2] + h_grid
 
-    # --- Color pattern: half red / half blue aligned with μ direction ---
-    # Project μ onto x–y plane:
-    mu_xy = np.array([mu_hat_epm[0], mu_hat_epm[1]])
-    mu_xy_norm = np.linalg.norm(mu_xy)
+#     # --- Color pattern: half red / half blue aligned with μ direction ---
+#     # Project μ onto x–y plane:
+#     mu_xy = np.array([mu_hat_epm[0], mu_hat_epm[1]])
+#     mu_xy_norm = np.linalg.norm(mu_xy)
 
-    if mu_xy_norm < 1e-8:
-        # If μ is almost vertical, choose some default split (e.g. along +x/-x)
-        mu_xy_hat = np.array([1.0, 0.0])
-    else:
-        mu_xy_hat = mu_xy / mu_xy_norm
+#     if mu_xy_norm < 1e-8:
+#         # If μ is almost vertical, choose some default split (e.g. along +x/-x)
+#         mu_xy_hat = np.array([1.0, 0.0])
+#     else:
+#         mu_xy_hat = mu_xy / mu_xy_norm
 
-    # Radial direction for each (theta) on the cylinder surface
-    r_x = np.cos(theta_grid)
-    r_y = np.sin(theta_grid)
+#     # Radial direction for each (theta) on the cylinder surface
+#     r_x = np.cos(theta_grid)
+#     r_y = np.sin(theta_grid)
 
-    # Dot product between projected μ and radial direction
-    # > 0 -> "north" side (red), < 0 -> "south" side (blue)
-    dots = mu_xy_hat[0] * r_x + mu_xy_hat[1] * r_y
+#     # Dot product between projected μ and radial direction
+#     # > 0 -> "north" side (red), < 0 -> "south" side (blue)
+#     dots = mu_xy_hat[0] * r_x + mu_xy_hat[1] * r_y
 
-    colors = np.empty(theta_grid.shape + (4,), dtype=float)
-    red_rgba  = np.array([1.0, 0.0, 0.0, 0.5])
-    blue_rgba = np.array([0.0, 0.0, 1.0, 0.5])
+#     colors = np.empty(theta_grid.shape + (4,), dtype=float)
+#     red_rgba  = np.array([1.0, 0.0, 0.0, 0.5])
+#     blue_rgba = np.array([0.0, 0.0, 1.0, 0.5])
 
-    colors[dots >= 0] = red_rgba
-    colors[dots <  0] = blue_rgba
+#     colors[dots >= 0] = red_rgba
+#     colors[dots <  0] = blue_rgba
 
-    ax.plot_surface(Xc, Yc, Zc,
-                    facecolors=colors,
-                    linewidth=0.2,
-                    edgecolor='k')
+#     ax.plot_surface(Xc, Yc, Zc,
+#                     facecolors=colors,
+#                     linewidth=0.2,
+#                     edgecolor='k')
 
-    # --- EPM dipole direction as arrow ---
-    L_mu = cyl_length * 0.7
-    mu_end = r_epm + L_mu * mu_hat_epm
-    ax.plot([r_epm[0], mu_end[0]],
-            [r_epm[1], mu_end[1]],
-            [r_epm[2], mu_end[2]],
-            '-', linewidth=3, label='μ̂ (EPM dipole)')
+#     # --- EPM dipole direction as arrow ---
+#     L_mu = cyl_length * 0.7
+#     mu_end = r_epm + L_mu * mu_hat_epm
+#     ax.plot([r_epm[0], mu_end[0]],
+#             [r_epm[1], mu_end[1]],
+#             [r_epm[2], mu_end[2]],
+#             '-', linewidth=3, label='μ̂ (EPM dipole)')
 
-    # --- EPM local axes from R_epm (this is where that matrix you printed shows up) ---
-    L_axis = cyl_length * 0.5
-    origin = r_epm
-    x_body = origin + L_axis * R_epm[:, 0]
-    y_body = origin + L_axis * R_epm[:, 1]
-    z_body = origin + L_axis * R_epm[:, 2]
+#     # --- EPM local axes from R_epm (this is where that matrix you printed shows up) ---
+#     L_axis = cyl_length * 0.5
+#     origin = r_epm
+#     x_body = origin + L_axis * R_epm[:, 0]
+#     y_body = origin + L_axis * R_epm[:, 1]
+#     z_body = origin + L_axis * R_epm[:, 2]
 
-    ax.plot([origin[0], x_body[0]],
-            [origin[1], x_body[1]],
-            [origin[2], x_body[2]],
-            '-', label='EPM x_body')
-    ax.plot([origin[0], y_body[0]],
-            [origin[1], y_body[1]],
-            [origin[2], y_body[2]],
-            '-', label='EPM y_body')
-    ax.plot([origin[0], z_body[0]],
-            [origin[1], z_body[1]],
-            [origin[2], z_body[2]],
-            '-', label='EPM z_body')
+#     ax.plot([origin[0], x_body[0]],
+#             [origin[1], x_body[1]],
+#             [origin[2], x_body[2]],
+#             '-', label='EPM x_body')
+#     ax.plot([origin[0], y_body[0]],
+#             [origin[1], y_body[1]],
+#             [origin[2], y_body[2]],
+#             '-', label='EPM y_body')
+#     ax.plot([origin[0], z_body[0]],
+#             [origin[1], z_body[1]],
+#             [origin[2], z_body[2]],
+#             '-', label='EPM z_body')
 
-    # --- B field at origin (optional) ---
-    if B_req is not None:
-        B_req = np.asarray(B_req, float)
-        L_B = cyl_length * 0.7
-        B_hat = B_req / (np.linalg.norm(B_req) + 1e-12)
-        B_end = L_B * B_hat
+#     # --- B field at origin (optional) ---
+#     if B_req is not None:
+#         B_req = np.asarray(B_req, float)
+#         L_B = cyl_length * 0.7
+#         B_hat = B_req / (np.linalg.norm(B_req) + 1e-12)
+#         B_end = L_B * B_hat
 
-        ax.plot([0.0, B_end[0]],
-                [0.0, B_end[1]],
-                [0.0, B_end[2]],
-                '-', linewidth=2, label='B direction @ origin')
+#         ax.plot([0.0, B_end[0]],
+#                 [0.0, B_end[1]],
+#                 [0.0, B_end[2]],
+#                 '-', linewidth=2, label='B direction @ origin')
 
-    # Axes labels
-    ax.set_xlabel('x [m]')
-    ax.set_ylabel('y [m]')
-    ax.set_zlabel('z [m]')
+#     # Axes labels
+#     ax.set_xlabel('x [m]')
+#     ax.set_ylabel('y [m]')
+#     ax.set_zlabel('z [m]')
 
-    # Equal aspect ratio (include cylinder in bounds)
-    xs = np.concatenate([p_nodes[:, 0], Xc.ravel(), [r_epm[0]]])
-    ys = np.concatenate([p_nodes[:, 1], Yc.ravel(), [r_epm[1]]])
-    zs = np.concatenate([p_nodes[:, 2], Zc.ravel(), [r_epm[2]]])
+#     # Equal aspect ratio (include cylinder in bounds)
+#     xs = np.concatenate([p_nodes[:, 0], Xc.ravel(), [r_epm[0]]])
+#     ys = np.concatenate([p_nodes[:, 1], Yc.ravel(), [r_epm[1]]])
+#     zs = np.concatenate([p_nodes[:, 2], Zc.ravel(), [r_epm[2]]])
 
-    x_range = xs.max() - xs.min()
-    y_range = ys.max() - ys.min()
-    z_range = zs.max() - zs.min()
-    max_range = max(x_range, y_range, z_range) * 0.6
+#     x_range = xs.max() - xs.min()
+#     y_range = ys.max() - ys.min()
+#     z_range = zs.max() - zs.min()
+#     max_range = max(x_range, y_range, z_range) * 0.6
 
-    x_mid = 0.5 * (xs.max() + xs.min())
-    y_mid = 0.5 * (ys.max() + ys.min())
-    z_mid = 0.5 * (zs.max() + zs.min())
+#     x_mid = 0.5 * (xs.max() + xs.min())
+#     y_mid = 0.5 * (ys.max() + ys.min())
+#     z_mid = 0.5 * (zs.max() + zs.min())
 
-    ax.set_xlim(x_mid - max_range, x_mid + max_range)
-    ax.set_ylim(y_mid - max_range, y_mid + max_range)
-    ax.set_zlim(z_mid - max_range, z_mid + max_range)
+#     ax.set_xlim(x_mid - max_range, x_mid + max_range)
+#     ax.set_ylim(y_mid - max_range, y_mid + max_range)
+#     ax.set_zlim(z_mid - max_range, z_mid + max_range)
 
-    ax.legend()
-    ax.set_title('Beam + External Cylindrical Magnet (μ-aligned split, axis = z)')
+#     ax.legend()
+#     ax.set_title('Beam + External Cylindrical Magnet (μ-aligned split, axis = z)')
 
-    plt.tight_layout()
-    plt.show()
+#     plt.tight_layout()
+#     plt.show()
 
-plot_beam_and_epm(
-    axes_list=axes,
-    thetas=thetas_eq,
-    lengths=lengths,
-    r_epm=r_epm,    
-    mu_hat_epm=mu_hat_epm,
-    R_epm=R_epm,
-    B_req=B_req,
-    R_base=None,
-    p_base=None,
-    cyl_radius=0.15,
-    cyl_length=0.2,
-)
+# plot_beam_and_epm(
+#     axes_list=axes,
+#     thetas=thetas_eq,
+#     lengths=lengths,
+#     r_epm=r_epm,    
+#     mu_hat_epm=mu_hat_epm,
+#     R_epm=R_epm,
+#     B_req=B_req,
+#     R_base=None,
+#     p_base=None,
+#     cyl_radius=0.15,
+#     cyl_length=0.2,
+# )

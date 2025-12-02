@@ -22,7 +22,6 @@ def rotx(theta):
     ])
 
 def transGen(R, t):
-    """Build 4x4 homogeneous transform from R (3x3) and t (3,)"""
     H = np.eye(4)
     H[:3, :3] = R
     H[:3,  3] = t
@@ -76,23 +75,9 @@ def rotate_around_point_transform(axis, pivot_pos, theta):
     return transGen(R, t)
 
 
-start_point = np.array([
-    0.8591984247948907,
-   -0.2714764828605954,
-    0.20603768069158077,
-    2.3911077741703193,
-   -1.9880074589982653,
-    0.02729820295870479
-])
+start_point = np.array([0.8044738038441734, -0.5510007927198923, 0.4330498000582408, -2.29598721437706, 2.137233721135031, 0.02151272219562204])
 
-pivot_point = np.array([
-   -0.107215706502096,
-   -2.141261716882223,
-   -1.714442491531372,
-   -0.8591966790011902,
-    1.5362006425857544,
-   -0.2898953596698206
-])
+pivot_point = np.array([0.8044738038441734, -0.4112657614330756, 0.17238122113144055, -3.0760125513655026, -0.5854704390599933, 0.08213552142709286])
 
 
 ee_pos0 = start_point[:3]
@@ -101,7 +86,7 @@ R_b_e0 = rotvec_to_R(ee_rvec0)
 H_b_e0 = transGen(R_b_e0, ee_pos0)
 
 
-mag_offset = np.array([0, 0, 0.25])
+mag_offset = np.array([0, 0, .2])
 H_e_m = transGen(np.eye(3), mag_offset)   
 
 
@@ -110,11 +95,12 @@ H_b_m0 = H_b_e0 @ H_e_m
 
 pivot_pos = pivot_point[:3]
 
+theta_z = np.deg2rad(30)
+H_rot_z = rotate_around_point_transform('z', pivot_pos, theta_z)
+theta_x = np.deg2rad(0)
+H_rot_x = rotate_around_point_transform('x', pivot_pos, theta_x)
 
-theta = np.deg2rad(90)
-H_rot = rotate_around_point_transform('z', pivot_pos, theta)
-
-
+H_rot = H_rot_x @ H_rot_z
 H_b_m1 = H_rot @ H_b_m0
 
 H_m_e = np.linalg.inv(H_e_m)
@@ -127,4 +113,4 @@ new_rvec = R_to_rotvec(new_R)
 new_pose_for_robot = np.hstack([new_pos, new_rvec])
 
 print("New EE pose to send to robot:")
-print(new_pose_for_robot)
+print(repr(new_pose_for_robot))

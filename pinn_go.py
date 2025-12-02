@@ -1,6 +1,5 @@
-import matplotlib.pyplot as plt
-import tensorflow as tf
-import deepxde as dde
+# import tensorflow as tf
+# import deepxde as dde
 import numpy as np
 from scipy.integrate import quad, cumulative_trapezoid
 from scipy.optimize import root_scalar
@@ -25,6 +24,7 @@ m_dir_local = np.array([0.0, 0.0, -1.0])
 eta_mag     = (mu_ipm_mag / L_ipm) * m_dir_local  # moment per unit length [A·m]
 eta0_list   = [eta_mag.copy()]
 mag_test = mu_ipm_mag / V_ipm
+print(f"mag_test is {mag_test}")
 def ddy(x, y):
     return dde.grad.hessian(y, x)
 

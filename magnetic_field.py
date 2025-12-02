@@ -17,10 +17,10 @@ def magnetic_moment(B_r, r, length):
     return term1*term2
 
 I3 = np.eye(3)
-p_vec= np.array([0.12,0,0])
+p_vec= np.array([0.084,0,0])
 m_vec = np.array([-1,0,0])
 mu0 = 4e-7*np.pi
-mag_hat = np.array([1,0,0])
+mag_hat = np.array([-1,0,0])
 theta = np.pi/2
 R = z_axis_rot(theta)
 m_hat = R@mag_hat
