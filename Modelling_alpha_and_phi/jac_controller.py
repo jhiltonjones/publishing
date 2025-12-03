@@ -22,10 +22,10 @@ def dtheta_dL(B, phi, mag, A_cs, L, E, I, dL=1e-4):
     return (theta_plus - theta_minus) / (2*dL)
 
 def jacobian_controller(theta_des,B_init, phi_init, L_init,
-                        mag, A_cs, E, I, L_min = 0.04, L_max=0.06, B_min=0.008, B_max = 0.025,
+                        mag, A_cs, E, I, L_min = 0.04, L_max=0.06, B_min=0.008, B_max = 0.02,
                         phi_min = np.deg2rad(-80), phi_max = np.deg2rad(80), dt=0.05,
                         Kp = 5.0, Ki = 0.0, Kd = 0.5, 
-                        max_iter = 1000, damping = 1e-3):
+                        max_iter = 300, damping = 1e-3):
 
 
     B = B_init
@@ -35,7 +35,7 @@ def jacobian_controller(theta_des,B_init, phi_init, L_init,
     e_init = 0
     e_prev = 0.0
     for k in range(max_iter):
-        print(B, phi, mag, A_cs, L, E, I)
+        # print(B, phi, mag, A_cs, L, E, I)
         act_theta = theta_angle_solved(B, phi, mag, A_cs, L, E, I)
         e = theta_des - act_theta
         e_dot = (e-e_prev)/dt
@@ -122,10 +122,10 @@ def solve_mag_pose(field_des, x_init, mu_0, mu, mu_hat, dt = 0.05, Kp = 1, Ki = 
 
 
 if __name__ == '__main__':
-    theta_target = np.deg2rad(35)
+    theta_target = np.deg2rad(22)
     mag = 128e3
     r = 0.0015
-    E = 3.6e6
+    E = 4.5e6
     A_cs = np.pi * r**2
     I = np.pi * r**4/4
     B_init = 0.01; phi_init = np.deg2rad(25); L_init = 0.04

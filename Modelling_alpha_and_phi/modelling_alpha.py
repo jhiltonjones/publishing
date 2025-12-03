@@ -4,6 +4,8 @@ from modelling_phi_angle import constant, root_scalar
 from jac_controller import theta_angle_solved
 import matplotlib.pyplot as plt
 
+
+def rotate
 if __name__ == '__main__':
 
     mu_0 = 4e-7*np.pi

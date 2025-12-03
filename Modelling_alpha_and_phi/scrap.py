@@ -22,7 +22,7 @@ if __name__ == '__main__':
     r = 0.0015
     A_cs = np.pi * r**2
     len_beam = 0.04
-    E = 3.6e6
+    E = 4.5e6
     I = np.pi * r**4 / 4
     mag = 128e3
 
@@ -36,13 +36,13 @@ if __name__ == '__main__':
     m0_hat = beam_dir.copy()  # EPM dipole direction when alpha = 0
 
     # Distance from EPM centre to beam tip (fixed radius)
-    R = 0.12  # m
+    R = 0.135  # m
 
     # Alpha values (rotation angle of EPM dipole around its own z axis)
     alpha_values = np.linspace(np.deg2rad(1), np.deg2rad(89), 181)
 
     # Phi values: arc angles of EPM position around the beam tip (in the x–y plane)
-    phi_values_deg = [1, 10, 30, 50, 55]
+    phi_values_deg = [130]
     phi_values = np.deg2rad(phi_values_deg)
 
     all_Beff = []

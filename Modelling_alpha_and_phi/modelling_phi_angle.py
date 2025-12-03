@@ -32,12 +32,12 @@ def tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I):
     return theta  # radians
 if __name__ == '__main__':
     length = 0.04
-    E = 3.6e6
+    E = 4.5e6
     radius = 0.0015
     A_cs = np.pi * radius**2
     I = np.pi * radius**4 / 4
-    phi = np.deg2rad(55.2)
-    B = 0.026
+    phi = np.deg2rad(60)
+    B = 0.02
     mag = 128e3
     rhs_eq = constant(B, mag, A_cs, length, E, I)
     print(rhs_eq)
