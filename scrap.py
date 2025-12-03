@@ -2,7 +2,6 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import root_scalar
 
-# ---------- existing elastica functions ----------
 
 def lambda_rhs(mag, B_mag, a_cs, leng, E, I):
     return (mag*B_mag*a_cs*leng**2) / (E*I)
@@ -26,6 +25,7 @@ def solve_for_lamba(lambda_target, phi, tol=1e-6):
     return sol.root
 
 def tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I):
+    print(B, phi, mag, A_cs, L, E, I)
     lam = lambda_rhs(mag, B, A_cs, L, E, I)
     theta = solve_for_lamba(lam, phi)
     return theta  # radians
@@ -52,44 +52,71 @@ def dtheta_dL(B, phi, mag, A_cs, L, E, I, h_rel=1e-3):
 
 # ---------- Jacobian-damped PID for B, phi, L ----------
 
+import numpy as np
+
 def jacobian_pid_controller_B_phi_L(theta_des_deg,
                                     B_init, phi_init, L_init,
                                     mag, A_cs, E, I,
                                     L_min=0.04, L_max=0.06,
-                                    B_min=0.008, B_max=0.08,   # 8–80 mT
+                                    B_min=0.008, B_max=0.025,   # 8–40 mT
                                     Kp=5.0, Ki=0.0, Kd=0.5,
                                     dt=0.05,
-                                    max_iter=200,
+                                    max_iter=400,
                                     damping=1e-3):
 
     theta_des = np.deg2rad(theta_des_deg)
+
+    # ---- phi bounds: 0° to 90° in radians ----
+    phi_min = 0.0
+    phi_max = 0.5 * np.pi
 
     B   = B_init
     phi = phi_init
     L   = L_init
 
+    # make sure initial phi starts inside [0, 90°]
+    phi = min(max(phi, phi_min), phi_max)
+
     e_int  = 0.0
     e_prev = 0.0
 
     for k in range(max_iter):
+        print(B, phi, mag, A_cs, L, E, I)
         theta = tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I)
         e = theta_des - theta
         e_dot = (e - e_prev) / dt
         e_int += e * dt
 
-        # PID on angle (desired angle rate)
         theta_dot_cmd = Kp*e + Ki*e_int + Kd*e_dot
 
-        # Jacobian entries
         J_B   = dtheta_dB(  B, phi, mag, A_cs, L, E, I)
         J_phi = dtheta_dphi(B, phi, mag, A_cs, L, E, I)
         J_L   = dtheta_dL(  B, phi, mag, A_cs, L, E, I)
+
+        # ---- make Jacobian aware of bounds ----
+        # B
+        if (B <= B_min and J_B * theta_dot_cmd < 0):
+            J_B = 0.0
+        if (B >= B_max and J_B * theta_dot_cmd > 0):
+            J_B = 0.0
+
+        # L
+        if (L <= L_min and J_L * theta_dot_cmd < 0):
+            J_L = 0.0
+        if (L >= L_max and J_L * theta_dot_cmd > 0):
+            J_L = 0.0
+
+        # phi (0 to 90 deg)
+        if (phi <= phi_min and J_phi * theta_dot_cmd < 0):
+            J_phi = 0.0
+        if (phi >= phi_max and J_phi * theta_dot_cmd > 0):
+            J_phi = 0.0
 
         JJt  = J_B**2 + J_phi**2 + J_L**2
         gain = theta_dot_cmd / (JJt + damping**2)
 
         dB   = J_B   * gain
-        dphi = J_phi * gain
+        dphi = J_phi * gain 
         dL   = J_L   * gain
 
         # integrate controls
@@ -98,24 +125,25 @@ def jacobian_pid_controller_B_phi_L(theta_des_deg,
         L   += dL * dt
 
         # ---- bounds / saturation ----
-        # B in [8 mT, 80 mT]
+        # B in [B_min, B_max]
         B = min(max(B, B_min), B_max)
 
-        # phi in [0, π]
-        if phi < 0.0:
-            phi += np.pi
-        if phi > np.pi:
-            phi -= np.pi
+        # phi in [0, 90°]
+        phi = min(max(phi, phi_min), phi_max)
 
         # L in [L_min, L_max]
         L = min(max(L, L_min), L_max)
 
         e_prev = e
 
+        theta = tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I)
+        e = theta_des - theta
+
         if abs(e) < np.deg2rad(0.5):
             break
 
     return B, phi, L, np.rad2deg(theta), k
+
 
 
 
@@ -154,6 +182,7 @@ def solve_x_for_Bmag_des(B_des_mag,
 
     for k in range(max_iter):
         p_vec = np.array([x, 0, 0])
+        print(f"parameters are x: {x}, mu: {mag}, mu_hat: {m_hat}")
         B = magnetic_field_bar(mu0, mag, p_vec, m_hat)
 
         B_mag = abs(B[0])        # field magnitude on dipole axis
@@ -180,7 +209,7 @@ if __name__ == '__main__':
 
     theta_desired = 40.0          # deg
     B0   = 0.01                   # T
-    phi0 = np.deg2rad(15.0)       # rad
+    phi0 = np.deg2rad(25.0)       # rad
     L0   = 0.05                   # m (initial free length)
 
     B_out, phi_out, L_out, theta_out_deg, iters = jacobian_pid_controller_B_phi_L(
@@ -215,3 +244,5 @@ if __name__ == '__main__':
     print("B at that p_vec:", B_final)
     print("Bx target:", B_out, "Bx achieved:", B_final[0])
     print("iterations:", iters)
+
+

@@ -37,10 +37,10 @@ if __name__ == '__main__':
     A_cs  = np.pi * r**2
     I_mag = np.pi * r**4 / 4.0
     L     = 0.04  
-    phi = np.deg2rad(40)
+    phi = np.deg2rad(66)
 
 
-    lambda_target = lambda_rhs(mag,0.2, A_cs, L, E_mag, I_mag )
+    lambda_target = lambda_rhs(mag,0.025, A_cs, L, E_mag, I_mag )
     print(lambda_target)
 
     theta_angle = solve_for_lamba(lambda_target, phi)

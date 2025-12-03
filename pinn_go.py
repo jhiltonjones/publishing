@@ -1,30 +1,31 @@
-# import tensorflow as tf
-# import deepxde as dde
-import numpy as np
+import tensorflow as tf
+import deepxde as dde
+import numpy as np 
+import matplotlib.pyplot as plt
 from scipy.integrate import quad, cumulative_trapezoid
 from scipy.optimize import root_scalar
 from scipy.interpolate import interp1d
 
 # Beam / catheter
-L_cat =0.024
-E_niti = 2.8e6         # [Pa]
-r1     = 0.0005        # [m]
+L_cat =0.05
+E_niti = 3.6e6        # [Pa]
+r1     = 0.0015        # [m]
 A_cs   = np.pi * r1**2
 I1     = np.pi * r1**4 / 4.0
+mag_test = 128e3  
+# # Inner permanent magnet (IPM)
+# Br       = 1.2
+# mu0      = 4e-7 * np.pi
+# D_ipm    = 0.03
+# L_ipm    = 0.04
+# V_ipm    = np.pi * (0.5 * D_ipm)**2 * L_ipm
+# mu_ipm_mag = 0.012 * V_ipm / mu0       # total dipole moment of IPM [A·m²]
 
-# Inner permanent magnet (IPM)
-Br       = 1.4
-mu0      = 4e-7 * np.pi
-D_ipm    = 0.002
-L_ipm    = 0.04
-V_ipm    = np.pi * (0.5 * D_ipm)**2 * L_ipm
-mu_ipm_mag = 0.012 * V_ipm / mu0       # total dipole moment of IPM [A·m²]
-
-m_dir_local = np.array([0.0, 0.0, -1.0])
-eta_mag     = (mu_ipm_mag / L_ipm) * m_dir_local  # moment per unit length [A·m]
-eta0_list   = [eta_mag.copy()]
-mag_test = mu_ipm_mag / V_ipm
-print(f"mag_test is {mag_test}")
+# m_dir_local = np.array([0.0, 0.0, -1.0])
+# eta_mag     = (mu_ipm_mag / L_ipm) * m_dir_local  # moment per unit length [A·m]
+# eta0_list   = [eta_mag.copy()]
+# mag_test = mu_ipm_mag / V_ipm
+# print(f"mag_test is {mag_test}")
 def ddy(x, y):
     return dde.grad.hessian(y, x)
 
@@ -32,8 +33,8 @@ def dddy(x, y):
     return dde.grad.jacobian(ddy(x, y), x)
 
 # --------- Dimensionless Λ as in the paper ----------
-eta_mag = (mu_ipm_mag / L_ipm) * np.array([1.0])   # scalar magnetization magnitude
-eta_norm = float(np.linalg.norm(eta_mag))
+# eta_mag = (mu_ipm_mag / L_ipm) * np.array([1.0])   # scalar magnetization magnitude
+# eta_norm = float(np.linalg.norm(eta_mag))
 
 def Lambda_from_B(B_mag):
     print(mag_test, B_mag, L_cat, E_niti, I1)
