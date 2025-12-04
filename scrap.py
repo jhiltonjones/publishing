@@ -2,17 +2,17 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import root_scalar
 
-
 def lambda_rhs(mag, B_mag, a_cs, leng, E, I):
-    return (mag*B_mag*a_cs*leng**2) / (E*I)
+    # mag = \tilde M_r in the paper
+    return (mag * B_mag * a_cs * leng**2) / (E * I)
 
 def xi_integral(phi, theta_l, eps = 1e-6):
     def integrand(theta):
         w = np.cos(phi-theta_l) - np.cos(phi-theta)
-        return 1/np.sqrt(w)
+        return 1.0 / np.sqrt(w)
     upper = theta_l - eps
     val, _ = quad(integrand, 0.0, upper, limit=200)
-    xi_val = 0.5*val**2
+    xi_val = 0.5 * val**2          # this is 1/2 * ξ^2
     return xi_val
 
 def solve_for_lamba(lambda_target, phi, tol=1e-6):
@@ -22,227 +22,51 @@ def solve_for_lamba(lambda_target, phi, tol=1e-6):
     def f(theta_l):
         return xi_integral(phi, theta_l) - lambda_target
     sol = root_scalar(f, bracket=[theta_min, theta_max], xtol=tol)
-    return sol.root
+    return sol.root   # θ_L
 
-def tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I):
-    print(B, phi, mag, A_cs, L, E, I)
-    lam = lambda_rhs(mag, B, A_cs, L, E, I)
-    theta = solve_for_lamba(lam, phi)
-    return theta  # radians
+# ---- NEW: X(φ,θL) and Y(φ,θL) integrals ----
 
-# ---------- numerical partial derivatives ----------
+def X_integral(phi, theta_l, eps=1e-6):
+    def integrand(theta):
+        w = np.cos(phi-theta_l) - np.cos(phi-theta)
+        return np.cos(theta) / np.sqrt(w)
+    upper = theta_l - eps   # avoid singularity at θ = θ_L
+    val, _ = quad(integrand, 0.0, upper, limit=200)
+    return val
 
-def dtheta_dB(B, phi, mag, A_cs, L, E, I, h_rel=1e-3):
-    h = h_rel * max(1.0, abs(B))
-    theta_p = tip_angle_from_B_phi_L(B + h, phi, mag, A_cs, L, E, I)
-    theta_m = tip_angle_from_B_phi_L(B - h, phi, mag, A_cs, L, E, I)
-    return (theta_p - theta_m) / (2*h)
-
-def dtheta_dphi(B, phi, mag, A_cs, L, E, I, h=1e-4):
-    theta_p = tip_angle_from_B_phi_L(B, phi + h, mag, A_cs, L, E, I)
-    theta_m = tip_angle_from_B_phi_L(B, phi - h, mag, A_cs, L, E, I)
-    return (theta_p - theta_m) / (2*h)
-
-def dtheta_dL(B, phi, mag, A_cs, L, E, I, h_rel=1e-3):
-    # relative step to keep it scale-aware
-    h = h_rel * max(1.0, abs(L))
-    theta_p = tip_angle_from_B_phi_L(B, phi, mag, A_cs, L + h, E, I)
-    theta_m = tip_angle_from_B_phi_L(B, phi, mag, A_cs, L - h, E, I)
-    return (theta_p - theta_m) / (2*h)
-
-# ---------- Jacobian-damped PID for B, phi, L ----------
-
-import numpy as np
-
-def jacobian_pid_controller_B_phi_L(theta_des_deg,
-                                    B_init, phi_init, L_init,
-                                    mag, A_cs, E, I,
-                                    L_min=0.04, L_max=0.06,
-                                    B_min=0.008, B_max=0.025,   # 8–40 mT
-                                    Kp=5.0, Ki=0.0, Kd=0.5,
-                                    dt=0.05,
-                                    max_iter=400,
-                                    damping=1e-3):
-
-    theta_des = np.deg2rad(theta_des_deg)
-
-    # ---- phi bounds: 0° to 90° in radians ----
-    phi_min = 0.0
-    phi_max = 0.5 * np.pi
-
-    B   = B_init
-    phi = phi_init
-    L   = L_init
-
-    # make sure initial phi starts inside [0, 90°]
-    phi = min(max(phi, phi_min), phi_max)
-
-    e_int  = 0.0
-    e_prev = 0.0
-
-    for k in range(max_iter):
-        print(B, phi, mag, A_cs, L, E, I)
-        theta = tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I)
-        e = theta_des - theta
-        e_dot = (e - e_prev) / dt
-        e_int += e * dt
-
-        theta_dot_cmd = Kp*e + Ki*e_int + Kd*e_dot
-
-        J_B   = dtheta_dB(  B, phi, mag, A_cs, L, E, I)
-        J_phi = dtheta_dphi(B, phi, mag, A_cs, L, E, I)
-        J_L   = dtheta_dL(  B, phi, mag, A_cs, L, E, I)
-
-        # ---- make Jacobian aware of bounds ----
-        # B
-        if (B <= B_min and J_B * theta_dot_cmd < 0):
-            J_B = 0.0
-        if (B >= B_max and J_B * theta_dot_cmd > 0):
-            J_B = 0.0
-
-        # L
-        if (L <= L_min and J_L * theta_dot_cmd < 0):
-            J_L = 0.0
-        if (L >= L_max and J_L * theta_dot_cmd > 0):
-            J_L = 0.0
-
-        # phi (0 to 90 deg)
-        if (phi <= phi_min and J_phi * theta_dot_cmd < 0):
-            J_phi = 0.0
-        if (phi >= phi_max and J_phi * theta_dot_cmd > 0):
-            J_phi = 0.0
-
-        JJt  = J_B**2 + J_phi**2 + J_L**2
-        gain = theta_dot_cmd / (JJt + damping**2)
-
-        dB   = J_B   * gain
-        dphi = J_phi * gain 
-        dL   = J_L   * gain
-
-        # integrate controls
-        B   += dB * dt
-        phi += dphi * dt
-        L   += dL * dt
-
-        # ---- bounds / saturation ----
-        # B in [B_min, B_max]
-        B = min(max(B, B_min), B_max)
-
-        # phi in [0, 90°]
-        phi = min(max(phi, phi_min), phi_max)
-
-        # L in [L_min, L_max]
-        L = min(max(L, L_min), L_max)
-
-        e_prev = e
-
-        theta = tip_angle_from_B_phi_L(B, phi, mag, A_cs, L, E, I)
-        e = theta_des - theta
-
-        if abs(e) < np.deg2rad(0.5):
-            break
-
-    return B, phi, L, np.rad2deg(theta), k
-
-
-
-
-import numpy as np
-
-def magnetic_field_bar(mu0, mag, p_vec, m_hat):
-    r = np.linalg.norm(p_vec)
-    p_hat = p_vec / r
-    constant = (mu0 * mag) / (4 * np.pi * r**3)
-    term1 = (3 * np.outer(p_hat, p_hat)) - np.eye(3)
-    return (constant * term1) @ m_hat
-
-def magnetic_moment(B_r, r, length):
-    term1 = B_r / mu0
-    term2 = np.pi * (r**2) * length
-    return term1 * term2
-
-def dBx_dx(mu0, mag, x, m_hat, h=1e-4):
-    """Derivative of the x-component of B wrt x."""
-    p_plus  = np.array([x + h, 0.0, 0.0])
-    p_minus = np.array([x - h, 0.0, 0.0])
-    Bp = magnetic_field_bar(mu0, mag, p_plus,  m_hat)
-    Bm = magnetic_field_bar(mu0, mag, p_minus, m_hat)
-    return (Bp[0] - Bm[0]) / (2*h)
-
-def solve_x_for_Bmag_des(B_des_mag,
-                         x_init,
-                         mu0, mag, m_hat,
-                         Kp=1.0,
-                         dt=0.05,
-                         max_iter=5000,
-                         damping=1e-3,
-                         tol=1e-5):
-
-    x = float(x_init)
-
-    for k in range(max_iter):
-        p_vec = np.array([x, 0, 0])
-        print(f"parameters are x: {x}, mu: {mag}, mu_hat: {m_hat}")
-        B = magnetic_field_bar(mu0, mag, p_vec, m_hat)
-
-        B_mag = abs(B[0])        # field magnitude on dipole axis
-        e = B_des_mag - B_mag    # scalar magnitude error
-
-        if abs(e) < tol:
-            break
-
-        # derivative of magnitude wrt x
-        Jx = dBx_dx(mu0, mag, x, m_hat)  # derivative of Bx wrt x
-        Jmag = np.sign(B[0]) * Jx        # d|B|/dx = sign(B) * dBx/dx
-
-        dx = (Kp * e * Jmag) / (Jmag**2 + damping**2)
-        x += dx * dt
-
-    return np.array([x, 0, 0]), magnetic_field_bar(mu0, mag, np.array([x,0,0]), m_hat), k
+def Y_integral(phi, theta_l, eps=1e-6):
+    def integrand(theta):
+        w = np.cos(phi-theta_l) - np.cos(phi-theta)
+        return np.sin(theta) / np.sqrt(w)
+    upper = theta_l - eps
+    val, _ = quad(integrand, 0.0, upper, limit=200)
+    return val
 
 if __name__ == '__main__':
-    mag   = 128e3       
-    E_mag = 3.6e6     
-    r     = 0.0015      
-    A_cs  = np.pi * r**2
-    I_mag = np.pi * r**4 / 4.0
+    # material + geometry
+    mag   = 128e3        # \tilde M_r
+    E_mag = 3.6e6        # E
+    r     = 0.0015       # radius
+    A_cs  = np.pi * r**2 # A
+    I_mag = np.pi * r**4 / 4.0  # I
+    L     = 0.05         # length
+    phi   = np.deg2rad(30)
 
-    theta_desired = 40.0          # deg
-    B0   = 0.01                   # T
-    phi0 = np.deg2rad(25.0)       # rad
-    L0   = 0.05                   # m (initial free length)
+    B_mag = 0.023       
 
-    B_out, phi_out, L_out, theta_out_deg, iters = jacobian_pid_controller_B_phi_L(
-        theta_desired,
-        B0, phi0, L0,
-        mag, A_cs, E_mag, I_mag,
-        L_min=0.04, L_max=0.04
-    )
+    lambda_target = lambda_rhs(mag, B_mag, A_cs, L, E_mag, I_mag)
+    print("lambda =", lambda_target)
 
-    print(f"Desired angle: {theta_desired:.1f} deg")
-    print(f"Achieved angle: {theta_out_deg:.2f} deg in {iters} iterations")
-    print(f"B ≈ {B_out:.4f} T")
-    print(f"phi ≈ {np.rad2deg(phi_out):.2f} deg")
-    print(f"L  ≈ {L_out:.4f} m")
+    theta_L = solve_for_lamba(lambda_target, phi)
+    print(f"θ_L = {np.rad2deg(theta_L):.2f} deg")
 
-    mu0 = 4e-7 * np.pi
-    B_r = 1.2
-    r_m = 0.03
-    L_m = 0.09
-    mag = magnetic_moment(1.2, 0.03, 0.09)
+    X_val = X_integral(phi, theta_L)
+    Y_val = Y_integral(phi, theta_L)
 
-    m_hat = np.array([-1.0, 0.0, 0.0])   # dipole moment along -x
-    x_init = 0.09                        # initial guess (9 cm)
+    pref = np.sqrt(E_mag * I_mag / (2.0 * mag * B_mag * A_cs))
 
-    p_vec, B_final, iters = solve_x_for_Bmag_des(
-        B_out,
-        x_init,
-        mu0, mag, m_hat
-    )
+    delta_x = pref * X_val
+    delta_y = pref * Y_val
 
-    print("p_vec (x-axis only):", p_vec)
-    print("B at that p_vec:", B_final)
-    print("Bx target:", B_out, "Bx achieved:", B_final[0])
-    print("iterations:", iters)
-
-
+    print(f"δx = {delta_x:.6f} m")
+    print(f"δy = {delta_y:.6f} m") 
