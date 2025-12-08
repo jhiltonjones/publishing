@@ -101,18 +101,22 @@ if __name__ == '__main__':
     phis = np.linspace(np.deg2rad(1), np.pi/2, 30)
     graph_inputs = []
 
-    # for L in lengths:
-    #     angles = []
-    #     for phi in phis:
-    #         rhs_eq = constant(B, mag, A_cs, L, E, I)
-    #         theta_L = root_theta(rhs_eq, phi)
-    #         angles.append(theta_L)
-    #     graph_inputs.append(angles)
+    for L in lengths:
+        angles = []
+        for phi in phis:
+            rhs_eq = constant(B, mag, A_cs, L, E, I)
+            theta_L = root_theta(rhs_eq, phi)
+            angles.append(theta_L)
+        graph_inputs.append(angles)
 
-    # plt.figure()
-    # for L, graph in zip(lengths, graph_inputs):
-    #     plt.plot(np.rad2deg(phis), np.rad2deg(graph), label=f"L={L:.2f} m")
-    # plt.legend()
-    # plt.show()
+    plt.figure()
+    for L, graph in zip(lengths, graph_inputs):
+        plt.plot(np.rad2deg(phis), np.rad2deg(graph), label=f"L={L:.3f} m")
+    plt.title("Bending Angle vs Phi Angle for different Beam Lengths")
+    plt.xlabel("Phi")
+    plt.ylabel("Bending of beam")
+    plt.grid()
+    plt.legend()
+    plt.show()
 
     
