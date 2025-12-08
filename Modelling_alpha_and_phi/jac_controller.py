@@ -1,6 +1,10 @@
 import numpy as np
 from modelling_phi_angle import constant, root_theta
 from magnetic_field_magnitude import magnetic_field, magnetic_moment
+from modelling_alpha import alpha_controller
+import os
+import pickle
+import matplotlib.pyplot as plt
 def theta_angle_solved(B, phi, mag, A_cs, L, E, I):
     rhs_eq = constant(B, mag, A_cs, L, E, I)
     theta_L = root_theta(rhs_eq, phi)
@@ -121,8 +125,55 @@ def solve_mag_pose(field_des, x_init, mu_0, mu, mu_hat, dt = 0.05, Kp = 1, Ki = 
     return x, field_curr
 
 
+def plot_theta_gradients_over_params(
+    B_range, phi_range, L_range,
+    mag, A_cs, E, I,
+    B_fixed, phi_fixed, L_fixed
+):
+    Bs = np.linspace(*B_range, 50)
+    dtheta_dB_vals = [
+        dtheta_dB(B, phi_fixed, mag, A_cs, L_fixed, E, I)
+        for B in Bs
+    ]
+
+    plt.figure()
+    plt.plot(Bs, dtheta_dB_vals)
+    plt.xlabel("B [T]")
+    plt.ylabel("dθ/dB [rad/T]")
+    plt.title("Gradient dθ/dB vs B")
+    plt.grid(True)
+    phis = np.linspace(*phi_range, 50)
+    dtheta_dphi_vals = [
+        dtheta_dphi(B_fixed, phi, mag, A_cs, L_fixed, E, I)
+        for phi in phis
+    ]
+
+    plt.figure()
+    plt.plot(np.rad2deg(phis), dtheta_dphi_vals)
+    plt.xlabel("phi [deg]")
+    plt.ylabel("dθ/dphi [rad/rad]")
+    plt.title("Gradient dθ/dphi vs phi")
+    plt.grid(True)
+
+    Ls = np.linspace(*L_range, 50)
+    dtheta_dL_vals = [
+        dtheta_dL(B_fixed, phi_fixed, mag, A_cs, L, E, I)
+        for L in Ls
+    ]
+
+    plt.figure()
+    plt.plot(Ls, dtheta_dL_vals)
+    plt.xlabel("L [m]")
+    plt.ylabel("dθ/dL [rad/m]")
+    plt.title("Gradient dθ/dL vs L")
+    plt.grid(True)
+
+    plt.show()
+
+
 if __name__ == '__main__':
-    theta_target = np.deg2rad(43.049)
+    theta_target = np.deg2rad(28.049)
+    theta_target2 = np.deg2rad(25)
     mag = 128e3
     r = 0.0015
     E = 4.5e6
@@ -137,7 +188,47 @@ if __name__ == '__main__':
     x_init = 0.09
     mag_epm = magnetic_moment(B_r, mu_0, r, p)
     print(f"Magnetic moment of EPM is {mag_epm}")
-    B_sol, phi_sol, L_sol, theta_sol = jacobian_controller(theta_target, B_init, phi_init, L_init, mag, A_cs, E, I, L_max=0.06)
+    B_sol, phi_sol, L_sol, theta_sol = jacobian_controller(theta_target, B_init, phi_init, L_init, mag, A_cs, E, I, L_max=0.04)
     print(f"B solution: {B_sol*1000}mT, phi_sol: {np.rad2deg(phi_sol)}, L_sol: {L_sol}, with angle of: {theta_sol}")
     mag_pose, field = solve_mag_pose(B_sol, x_init, mu_0, mag_epm, m_hat)
     print(f"Magnetic distance is {mag_pose} which prodices a field of {field}")
+    phi_fixed = phi_sol  
+    L_fixed = L_sol      
+    alpha_init = 0.0
+    danger_file = "alpha_danger_map.pkl"
+    if os.path.exists(danger_file):
+        with open(danger_file, "rb") as f:
+            saved = pickle.load(f)
+        phi_values = saved["phi_values"]
+        alphas = saved["alphas"]
+        danger_intervals_by_phi = saved["danger_intervals_by_phi"]
+        print("Loaded precomputed data")
+    else:
+        print("Could not load the danger file")
+
+    alpha_sol, theta_final, B_final, status = alpha_controller(
+        theta_des = theta_target2,      
+        phi_fixed = phi_fixed,
+        alpha_init = alpha_init,
+        R = mag_pose, m0 = mag_epm, mu0 = mu_0,
+        mag = mag, A_cs = A_cs, L = L_fixed, E = E, I = I,
+        danger_intervals_by_phi = danger_intervals_by_phi,
+        phi_values = phi_values,
+        alpha_min = np.deg2rad(-180),
+        alpha_max = np.deg2rad(180),
+        dt = 0.05,
+        Kp = 5.0, Ki = 0.0, Kd = 0.5
+    )
+
+    print("alpha status:", status)
+    print("alpha solution:", np.rad2deg(alpha_sol), "deg")
+    print("theta final:", np.rad2deg(theta_final), "deg")
+
+    B_range = (0.01, 0.04)            
+    phi_range = (np.deg2rad(1), np.deg2rad(80)) 
+    L_range = (0.01, 0.06)            
+    if status != "converged":
+        B_sol, phi_sol, L_sol, theta_sol = jacobian_controller(theta_target2, B_sol, phi_sol, L_sol, mag, A_cs, E, I, L_max=0.04)
+        print(f"B solution: {B_sol*1000}mT, phi_sol: {np.rad2deg(phi_sol)}, L_sol: {L_sol}, with angle of: {theta_sol}")
+        mag_pose, field = solve_mag_pose(B_sol, x_init, mu_0, mag_epm, m_hat)
+        print(f"Magnetic distance is {mag_pose} which prodices a field of {field}")
