@@ -122,10 +122,10 @@ def solve_mag_pose(field_des, x_init, mu_0, mu, mu_hat, dt = 0.05, Kp = 1, Ki = 
 
 
 if __name__ == '__main__':
-    theta_target = np.deg2rad(43.049)
+    theta_target = np.deg2rad(36.72)
     mag = 128e3
     r = 0.0015
-    E = 4.5e6
+    E = 5.4e6
     A_cs = np.pi * r**2
     I = np.pi * r**4/4
     B_init = 0.01; phi_init = np.deg2rad(25); L_init = 0.04
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     x_init = 0.09
     mag_epm = magnetic_moment(B_r, mu_0, r, p)
     print(f"Magnetic moment of EPM is {mag_epm}")
-    B_sol, phi_sol, L_sol, theta_sol = jacobian_controller(theta_target, B_init, phi_init, L_init, mag, A_cs, E, I, L_max=0.06)
+    B_sol, phi_sol, L_sol, theta_sol = jacobian_controller(theta_target, B_init, phi_init, L_init, mag, A_cs, E, I, L_max=0.048)
     print(f"B solution: {B_sol*1000}mT, phi_sol: {np.rad2deg(phi_sol)}, L_sol: {L_sol}, with angle of: {theta_sol}")
     mag_pose, field = solve_mag_pose(B_sol, x_init, mu_0, mag_epm, m_hat)
     print(f"Magnetic distance is {mag_pose} which prodices a field of {field}")

@@ -73,7 +73,7 @@ def find_angle_and_length(phi, delta_x, delta_y, mag, B, A_cs, E, I, eps = 1e-4,
     return theta_l_sol, length
 
 if __name__ == '__main__':
-    length = 0.0329
+    length = 0.04
     E = 4.5e6
     radius = 0.0015
     A_cs = np.pi * radius**2
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     theta_from_x = find_theta_L(33.33/1000, phi, constant_carti)
     print(f"theta position from x is: {np.rad2deg(theta_from_x)}")
  
-    theta_angle, length_from_carti = find_angle_and_length(phi, 33.33/1000, 19.28/1000, mag, B, A_cs, E, I)
+    theta_angle, length_from_carti = find_angle_and_length(phi,  43/1000, 18.6/1000, mag, B, A_cs, E, I)
     print(f"The recovered angle is {np.rad2deg(theta_angle)} with length {length_from_carti}")
     lengths = np.linspace(0.04, 0.06, 4)
     phis = np.linspace(np.deg2rad(1), np.pi/2, 30)
